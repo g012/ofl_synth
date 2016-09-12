@@ -15,7 +15,7 @@ int main(int argc, char** argv)
     void* buf = malloc(buf_sz);
     ofl_synth_init(s, buf, buf_sz, samplingrate);
 
-    ofl_synth_osc_sin(s, s->buf_len, 440.0f);
+    ofl_synth_osc_saw(s, 440.0f);
 
     FILE* f = fopen("test.wav", "wb");
     ofl_synth_fwrite_wav(s, s_fwrite, f);
