@@ -44,6 +44,8 @@ OFL_SYNTH_DEF void ofl_synth_fx_adsr(struct ofl_synth *s, float attack_s, float 
 OFL_SYNTH_DEF void ofl_synth_fx_mul(struct ofl_synth *s, float f);
 OFL_SYNTH_DEF void ofl_synth_fx_pow(struct ofl_synth *s, float e);
 OFL_SYNTH_DEF void ofl_synth_fx_delay(struct ofl_synth *s, float delay_s, float feedback, float dry, float wet);
+enum ofl_synth_fx_filter_type { OFL_SYNTH_FX_FILTER_TYPE_LOWPASS, OFL_SYNTH_FX_FILTER_TYPE_HIGHPASS, OFL_SYNTH_FX_FILTER_TYPE_BANDPASS, OFL_SYNTH_FX_FILTER_TYPE_NOTCH };
+OFL_SYNTH_DEF void ofl_synth_fx_filter(struct ofl_synth *s, enum ofl_synth_fx_filter_type t, float cutoff, float q);
 
 typedef size_t (*ofl_synth_fwrite)(void *ctx, const void *ptr, size_t size);
 OFL_SYNTH_DEF void ofl_synth_fwrite_raw(struct ofl_synth *s, ofl_synth_fwrite fw, void *ctx);
@@ -197,13 +199,13 @@ OFL_SYNTH_DEF void ofl_synth_fx_adsr(struct ofl_synth *s, float attack_s, float 
 OFL_SYNTH_DEF void ofl_synth_fx_mul(struct ofl_synth *s, float f)
 {
     float *b = s->buf + s->buf_off;
-    for (int i = 0; i < s->buf_len; ++i) *b++ *= f;
+    for (float *e = b + s->buf_len; b != e;) *b++ *= f;
 }
 
 OFL_SYNTH_DEF void ofl_synth_fx_pow(struct ofl_synth *s, float e)
 {
     float *b = s->buf + s->buf_off;
-    for (int i = 0; i < s->buf_len; ++i, ++b) *b = *b < 0 ? -powf(-*b, e) : pow(*b, e);
+    for (float *d = b + s->buf_len; b != d; ++b) *b = *b < 0 ? -powf(-*b, e) : powf(*b, e);
 }
 
 OFL_SYNTH_DEF void ofl_synth_fx_delay(struct ofl_synth *s, float delay_s, float feedback, float dry, float wet)
@@ -221,6 +223,34 @@ OFL_SYNTH_DEF void ofl_synth_fx_delay(struct ofl_synth *s, float delay_s, float 
         if (++hj >= sc) hj = 0;
     }
     OFL_SYNTH_FREEA(h);
+}
+
+// RBJ's cookbook
+OFL_SYNTH_DEF void ofl_synth_fx_filter(struct ofl_synth *s, enum ofl_synth_fx_filter_type t, float cutoff, float q)
+{
+    float w = OFL_SYNTH_2PI * cutoff * s->samplingrate_i;
+    float cw = cosf(w), sw = sinf(w);
+    float a = sw / (2*q);
+    float b0, b1, b2, a0, a1, a2;
+    a0 = 1+a; a1 = -2*cw; a2 = 1-a;
+    switch (t)
+    {
+        case OFL_SYNTH_FX_FILTER_TYPE_LOWPASS: b1 = 1-cw; b0 = b2 = 0.5f * b1; break;
+        case OFL_SYNTH_FX_FILTER_TYPE_HIGHPASS: b1 = -1-cw; b0 = b2 = -0.5f * b1; break;
+        case OFL_SYNTH_FX_FILTER_TYPE_BANDPASS: b1 = 0; b0 = 0.5f*sw; b2 = -b0; break;
+        default: b0 = b2 = 1; b1 = -2*cw; break;
+    }
+    float c1 = b0/a0, c2 = b1/a0, c3 = b2/a0, c4 = -a1/a0, c5 = -a2/a0;
+    float x[2] = { 0 }, y[2] = { 0 };
+    float *b = s->buf + s->buf_off;
+    for (float *e = b + s->buf_len; b != e; ++b)
+    {
+        float v = *b;
+        float f = c1*v + c2*x[1] + c3*x[0] + c4*y[1] + c5*y[0];
+        *b = f;
+        x[0] = x[1]; x[1] = v;
+        y[0] = y[1]; y[1] = f;
+    }
 }
 
 OFL_SYNTH_DEF void ofl_synth_fwrite_raw(struct ofl_synth *s, ofl_synth_fwrite fw, void *ctx)

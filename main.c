@@ -19,6 +19,8 @@ int main(int argc, char** argv)
     ofl_synth_fx_amp(s, -6);
     ofl_synth_fx_adsr(s, 0.1f, 0.2f, 0.4f, 0.3f, -8);
     ofl_synth_fx_delay(s, 0.048f, 0.65f, 1, 0.5f);
+    ofl_synth_fx_filter(s, OFL_SYNTH_FX_FILTER_TYPE_LOWPASS, 2000, 1);
+    ofl_synth_fx_ssat(s, 0.5f);
 
     FILE* f = fopen("test.wav", "wb");
     ofl_synth_fwrite_wav(s, s_fwrite, f);
