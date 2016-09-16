@@ -3,9 +3,9 @@
 local names = {"C","CS","D","DS","E","F","FS","G","GS","A","AS","B"}
 local fn = assert(io.open("ofl_synth_lut.h", "wb"))
 local f = assert(io.open("ofl_synth_lut.c", "wb"))
-f:write("const float ofl_synth_notes[11*12] = {\n")
+f:write("const float ofl_synth_notes[10*12] = {\n")
 local p = math.pow(2, 1/12)
-for k=0,10 do
+for k=0,9 do
     f:write("\t")
     for n=-9,2 do
         local freq = math.pow(2, k-4) * 440 * math.pow(p, n)

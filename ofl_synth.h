@@ -17,7 +17,9 @@ extern "C" {
 
 #define OFL_SYNTH_DB_TO_VOLTAGERATIO(db) (powf(10, db * (1.0f/20)))
 
-OFL_SYNTH_DEF const float ofl_synth_notes[11*12]; // C0 to B10
+#ifndef OFL_SYNTH_STATIC
+OFL_SYNTH_DEF const float ofl_synth_notes[10*12]; // C0 to B9
+#endif
 #define OFL_SYNTH_NOTE_C0 (16.3515978f)
 #define OFL_SYNTH_NOTE_CS0 (17.3239144f)
 #define OFL_SYNTH_NOTE_D0 (18.3540480f)
@@ -148,19 +150,6 @@ OFL_SYNTH_DEF const float ofl_synth_notes[11*12]; // C0 to B10
 #define OFL_SYNTH_NOTE_AS9 (14917.2404f)
 #define OFL_SYNTH_NOTE_B9 (15804.2656f)
 
-#define OFL_SYNTH_NOTE_C10 (16744.0362f)
-#define OFL_SYNTH_NOTE_CS10 (17739.6884f)
-#define OFL_SYNTH_NOTE_D10 (18794.5451f)
-#define OFL_SYNTH_NOTE_DS10 (19912.1270f)
-#define OFL_SYNTH_NOTE_E10 (21096.1636f)
-#define OFL_SYNTH_NOTE_F10 (22350.6068f)
-#define OFL_SYNTH_NOTE_FS10 (23679.6431f)
-#define OFL_SYNTH_NOTE_G10 (25087.7079f)
-#define OFL_SYNTH_NOTE_GS10 (26579.5006f)
-#define OFL_SYNTH_NOTE_A10 (28160.0000f)
-#define OFL_SYNTH_NOTE_AS10 (29834.4807f)
-#define OFL_SYNTH_NOTE_B10 (31608.5313f)
-
 struct ofl_synth
 {
     float samplingrate, samplingrate_i;
@@ -175,8 +164,9 @@ OFL_SYNTH_DEF void ofl_synth_mix_add(struct ofl_synth *s, struct ofl_synth *s1, 
 OFL_SYNTH_DEF void ofl_synth_mix_sub(struct ofl_synth *s, struct ofl_synth *s1, struct ofl_synth *s2);
 
 OFL_SYNTH_DEF void ofl_synth_osc_set(struct ofl_synth *s, float v);
+OFL_SYNTH_DEF void ofl_synth_osc_noi(struct ofl_synth *s, float (*f_randf)(void));
 OFL_SYNTH_DEF void ofl_synth_osc_sin(struct ofl_synth *s, float freq);
-OFL_SYNTH_DEF void ofl_synth_osc_sqr(struct ofl_synth *s, float freq);
+OFL_SYNTH_DEF void ofl_synth_osc_sqr(struct ofl_synth *s, float freq, float duty);
 OFL_SYNTH_DEF void ofl_synth_osc_saw(struct ofl_synth *s, float freq);
 OFL_SYNTH_DEF void ofl_synth_osc_tri(struct ofl_synth *s, float freq);
 
@@ -231,7 +221,7 @@ OFL_SYNTH_DEF void ofl_synth_fwrite_wav(struct ofl_synth *s, ofl_synth_fwrite fw
 #ifdef OFL_SYNTH_STATIC
 static
 #endif
-const float ofl_synth_notes[11*12] = {
+const float ofl_synth_notes[10*12] = {
 	16.3515978f,17.3239144f,18.3540480f,19.4454365f,20.6017223f,21.8267645f,23.1246514f,24.4997147f,25.9565436f,27.5000000f,29.1352351f,30.8677063f,
 	32.7031957f,34.6478289f,36.7080960f,38.8908730f,41.2034446f,43.6535289f,46.2493028f,48.9994295f,51.9130872f,55.0000000f,58.2704702f,61.7354127f,
 	65.4063913f,69.2956577f,73.4161920f,77.7817459f,82.4068892f,87.3070579f,92.4986057f,97.9988590f,103.826174f,110.000000f,116.540940f,123.470825f,
@@ -242,7 +232,6 @@ const float ofl_synth_notes[11*12] = {
 	2093.00452f,2217.46105f,2349.31814f,2489.01587f,2637.02046f,2793.82585f,2959.95538f,3135.96349f,3322.43758f,3520.00000f,3729.31009f,3951.06641f,
 	4186.00904f,4434.92210f,4698.63629f,4978.03174f,5274.04091f,5587.65170f,5919.91076f,6271.92698f,6644.87516f,7040.00000f,7458.62018f,7902.13282f,
 	8372.01809f,8869.84419f,9397.27257f,9956.06348f,10548.0818f,11175.3034f,11839.8215f,12543.8540f,13289.7503f,14080.0000f,14917.2404f,15804.2656f,
-	16744.0362f,17739.6884f,18794.5451f,19912.1270f,21096.1636f,22350.6068f,23679.6431f,25087.7079f,26579.5006f,28160.0000f,29834.4807f,31608.5313f,
 };
 
 OFL_SYNTH_DEF void ofl_synth_init(struct ofl_synth *s, float *buf, size_t buf_sz, float samplingrate)
@@ -281,6 +270,12 @@ OFL_SYNTH_DEF void ofl_synth_osc_set(struct ofl_synth *s, float v)
     for (float* e = b + s->buf_len; b != e; ++b) *b = v;
 }
 
+OFL_SYNTH_DEF void ofl_synth_osc_noi(struct ofl_synth *s, float (*f_randf)(void))
+{
+    float *b = s->buf + s->buf_off;
+    for (float *e = b + s->buf_len; b != e;) *b++ = f_randf();
+}
+
 OFL_SYNTH_DEF void ofl_synth_osc_sin(struct ofl_synth *s, float freq)
 {
     float f = freq * s->samplingrate_i * OFL_SYNTH_2PI;
@@ -288,11 +283,11 @@ OFL_SYNTH_DEF void ofl_synth_osc_sin(struct ofl_synth *s, float freq)
     for (int i = 0; i < s->buf_len; ++i) *b++ = sinf(i * f);
 }
 
-OFL_SYNTH_DEF void ofl_synth_osc_sqr(struct ofl_synth *s, float freq)
+OFL_SYNTH_DEF void ofl_synth_osc_sqr(struct ofl_synth *s, float freq, float duty)
 {
     float f = freq * s->samplingrate_i * 2;
     float *b = s->buf + s->buf_off;
-    for (int i = 0; i < s->buf_len; ++i) *b++ = fmodf(i*f, 2) < 1 ? 1 : -1;
+    for (int i = 0; i < s->buf_len; ++i) *b++ = fmodf(i*f, 2) < duty ? 1 : -1;
 }
 
 OFL_SYNTH_DEF void ofl_synth_osc_saw(struct ofl_synth *s, float freq)
